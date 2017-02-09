@@ -6,8 +6,8 @@ android {
 
     defaultConfig {
         applicationId "com.example.xw.baidumaptest"
-        minSdkVersion 21
-        targetSdkVersion 23
+        minSdkVersion 14
+        targetSdkVersion 21
         versionCode 1
         versionName "1.0"
     }
@@ -27,4 +27,5 @@ dependencies {
     compile 'eu.the4thfloor.volley:com.android.volley:2015.05.28'
     compile 'com.google.code.gson:gson:2.2.4'
     compile 'com.android.support:design:24.1.1'
+    compile files('libs/core-3.3.0.jar')
 }

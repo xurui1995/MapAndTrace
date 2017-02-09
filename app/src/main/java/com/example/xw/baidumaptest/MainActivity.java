@@ -1,9 +1,12 @@
 package com.example.xw.baidumaptest;
 
 import android.app.ActionBar;
+import android.content.Intent;
+import android.graphics.Bitmap;
 import android.graphics.Point;
 import android.graphics.drawable.BitmapDrawable;
 import android.support.design.widget.FloatingActionButton;
+import android.support.v7.app.AlertDialog;
 import android.support.v7.app.AppCompatActivity;
 import android.os.Bundle;
 import android.util.Log;
@@ -17,6 +20,7 @@ import android.widget.Toast;
 import com.android.volley.RequestQueue;
 import com.android.volley.Response;
 import com.android.volley.VolleyError;
+import com.android.volley.toolbox.JsonObjectRequest;
 import com.android.volley.toolbox.StringRequest;
 import com.android.volley.toolbox.Volley;
 import com.baidu.mapapi.SDKInitializer;
@@ -30,9 +34,15 @@ import com.baidu.mapapi.map.OverlayOptions;
 import com.baidu.mapapi.model.LatLng;
 import com.baidu.mapapi.model.LatLngBounds;
 import com.example.xw.baidumaptest.Model.AgencyData;
+import com.example.xw.baidumaptest.Model.ProductData;
 import com.google.gson.Gson;
 
+import org.json.JSONException;
+import org.json.JSONObject;
+
 import java.util.List;
+
+import zxing.android.CaptureActivity;
 
 public class MainActivity extends AppCompatActivity {
 
@@ -52,6 +62,13 @@ public class MainActivity extends AppCompatActivity {
     TextView numBTextView;
     List<AgencyData.Agency> list;
     FloatingActionButton list_btn;
+    FloatingActionButton trace_btn;
+    String product_msg;
+
+    private static final String DECODED_CONTENT_KEY = "codedContent";
+    private static final String DECODED_BITMAP_KEY = "codedBitmap";
+
+    private static final int REQUEST_CODE_SCAN = 0x0000;
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
@@ -65,6 +82,15 @@ public class MainActivity extends AppCompatActivity {
             @Override
             public void onClick(View view) {
                 Toast.makeText(MainActivity.this,"111",Toast.LENGTH_SHORT).show();
+            }
+        });
+        trace_btn= (FloatingActionButton) findViewById(R.id.trace_btn);
+        trace_btn.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View view) {
+                Intent intent = new Intent(MainActivity.this,
+                        CaptureActivity.class);
+                startActivityForResult(intent, REQUEST_CODE_SCAN);
             }
         });
 
@@ -211,5 +237,71 @@ public class MainActivity extends AppCompatActivity {
         super.onPause();
         //在activity执行onPause时执行mMapView. onPause ()，实现地图生命周期管理
         mMapView.onPause();
+    }
+    @Override
+    protected void onActivityResult(int requestCode, int resultCode, Intent data) {
+        super.onActivityResult(requestCode, resultCode, data);
+        // 扫描二维码/条码回传
+        if (requestCode == REQUEST_CODE_SCAN && resultCode == RESULT_OK) {
+            if (data != null) {
+                String content = data.getStringExtra(DECODED_CONTENT_KEY);
+                System.out.println(content);
+                search(content);
+
+
+
+            }
+        }
+    }
+    private void search(String content){
+        JsonObjectRequest jsonObjectRequest = new JsonObjectRequest("http://192.168.191.1:8080/BiShe/ProductSearchServlet?sn="+content, null,
+                new Response.Listener<JSONObject>() {
+                    @Override
+                    public void onResponse(JSONObject response) {
+                        buildDialog(response);
+                    }
+                }, new Response.ErrorListener() {
+            @Override
+            public void onErrorResponse(VolleyError error) {
+                Log.e("TAG", error.getMessage(), error);
+            }
+        });
+        mQueue.add(jsonObjectRequest);
+    }
+    private void buildDialog(JSONObject jsonObject){
+        AlertDialog.Builder builder = new AlertDialog.Builder(this);
+//设置对话框图标，可以使用自己的图片，Android本身也提供了一些图标供我们使用
+        builder.setIcon(android.R.drawable.ic_dialog_alert);
+//设置对话框标题
+        builder.setTitle("溯源结果");
+//设置对话框内的文本
+        try {
+           product_msg=jsonObject.getString("msg");
+        } catch (JSONException e) {
+            e.printStackTrace();
+        }
+        if (product_msg.equals("wrong")){
+            builder.setMessage("没有该件产品信息");
+        }else{
+            try {
+                JSONObject product=jsonObject.getJSONObject("product");
+                String sn=product.getString("sn");
+                String worker=product.getString("worker");
+                String agency=product.getString("agency");
+                String factory=product.getString("factory");
+                String date=product.getString("date");
+                builder.setMessage("sn："+sn+"\n"+
+                                   "出库工厂："+factory+"\n"+
+                                   "出库日期："+date);
+            } catch (JSONException e) {
+                e.printStackTrace();
+            }
+
+
+        }
+
+        AlertDialog dialog = builder.create();
+//显示对话框
+        dialog.show();
     }
 }
